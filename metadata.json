@@ -1,0 +1,5 @@
+{
+  "name": "Real-Time Network Monitor",
+  "description": "A user-friendly GUI to visualize application processes and their network communications in real-time, simulating data for a Windows 10/11 environment.",
+  "requestFramePermissions": []
+}

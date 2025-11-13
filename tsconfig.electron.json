@@ -1,0 +1,15 @@
+
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "CommonJS",
+    "outDir": "./build",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node"
+  },
+  "include": ["electron.ts", "preload.ts", "types.ts"],
+  "exclude": ["node_modules", "src"]
+}
