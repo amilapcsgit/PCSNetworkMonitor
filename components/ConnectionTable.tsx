@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import type { ConnectionDetail } from '../types';
 import { ChipIcon } from './icons/ChipIcon';
 import { GlobeIcon } from './icons/GlobeIcon';
+import { CountryBadge } from './CountryFlagSVG';
 
 interface ConnectionTableProps {
     connections: ConnectionDetail[];
@@ -134,11 +135,13 @@ const ConnectionTable: React.FC<ConnectionTableProps> = ({ connections, isLoadin
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center gap-2 text-xs text-gray-500">
-                                                            <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
-                                                                <GlobeIcon className="w-2.5 h-2.5 text-blue-400" />
-                                                            </div>
-                                                            <span>{conn.country}</span>
-                                                            {conn.region && <span>• {conn.region}</span>}
+                                                            <CountryBadge 
+                                                                countryCode={conn.country} 
+                                                                showName={true}
+                                                                size="sm"
+                                                                className="text-gray-400"
+                                                            />
+                                                            {conn.region && <span className="text-gray-600">• {conn.region}</span>}
                                                         </div>
                                                     </div>
                                                     <div className="hidden md:flex items-center text-xs text-gray-400 whitespace-nowrap">

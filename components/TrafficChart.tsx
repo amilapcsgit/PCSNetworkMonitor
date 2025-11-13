@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar } from 'recharts';
 import type { ConnectionDetail } from '../types';
 import { GlobeIcon } from './icons/GlobeIcon';
+import { CountryFlagSVG, getCountryName } from './CountryFlagSVG';
 
 interface TrafficChartProps {
     connections: ConnectionDetail[];
@@ -10,6 +11,40 @@ interface TrafficChartProps {
     selectedCountry?: string | null;
     onCountrySelect?: (country: string | null) => void;
 }
+
+interface CustomTickProps {
+    x?: number;
+    y?: number;
+    payload?: { value: string };
+}
+
+const CustomXAxisTick: React.FC<CustomTickProps> = ({ x, y, payload }) => {
+    const countryCode = payload?.value || '';
+    const countryName = getCountryName(countryCode);
+    
+    return (
+        <g transform={`translate(${x},${y})`}>
+            <foreignObject x={-30} y={0} width={60} height={40}>
+                <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    justifyContent: 'center', 
+                    alignItems: 'center', 
+                    width: '100%', 
+                    height: '100%',
+                    fontSize: '11px'
+                }}>
+                    <div style={{ fontSize: '16px', lineHeight: '1' }}>
+                        <CountryFlagSVG countryCode={countryCode} size="md" />
+                    </div>
+                    <div style={{ color: '#a0a0a0', fontSize: '9px', marginTop: '2px' }}>
+                        {countryCode}
+                    </div>
+                </div>
+            </foreignObject>
+        </g>
+    );
+};
 
 const TrafficChart: React.FC<TrafficChartProps> = ({ connections, isLoading, selectedCountry, onCountrySelect }) => {
     const data = useMemo(() => {
@@ -65,7 +100,7 @@ const TrafficChart: React.FC<TrafficChartProps> = ({ connections, isLoading, sel
                                 }
                             }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#444444" opacity={0.3} />
-                                <XAxis dataKey="country" stroke="#888888" tick={{ fontSize: 12, fill: '#a0a0a0' }} />
+                                <XAxis dataKey="country" stroke="#888888" tick={<CustomXAxisTick />} />
                                 <YAxis stroke="#888888" tick={{ fontSize: 12, fill: '#a0a0a0' }} allowDecimals={false} />
                                 <Tooltip 
                                     cursor={{ fill: 'rgba(34, 211, 238, 0.1)' }}
@@ -79,11 +114,18 @@ const TrafficChart: React.FC<TrafficChartProps> = ({ connections, isLoading, sel
                                     wrapperStyle={{ outline: 'none' }}
                                     content={({ active, payload }: any) => {
                                         if (active && payload && payload.length) {
+                                            const country = payload[0].payload.country;
+                                            const countryName = getCountryName(country);
                                             return (
-                                                <div className="bg-gray-900 border border-cyan-400 rounded-lg p-2 text-xs text-white">
-                                                    <p className="font-semibold text-cyan-300">{payload[0].payload.country}</p>
+                                                <div className="bg-gray-900 border border-cyan-400 rounded-lg p-3 text-xs text-white">
+                                                    <p className="font-semibold text-cyan-300 mb-2 flex items-center gap-2">
+                                                        <span style={{ fontSize: '16px' }}>
+                                                            <CountryFlagSVG countryCode={country} />
+                                                        </span>
+                                                        <span>{countryName}</span>
+                                                    </p>
                                                     <p className="text-gray-300">{payload[0].value} connections</p>
-                                                    <p className="text-gray-500 text-xs mt-1">Click to filter</p>
+                                                    <p className="text-gray-500 text-xs mt-2">Click to filter</p>
                                                 </div>
                                             );
                                         }

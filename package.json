@@ -19,6 +19,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "flag-icons": "^7.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -47,7 +48,9 @@
       "buildResources": "assets"
     },
     "win": {
-      "target": ["portable"]
+      "target": [
+        "portable"
+      ]
     }
   }
 }

@@ -4,6 +4,7 @@ import type { ConnectionDetail } from './types';
 import Header from './components/Header';
 import ConnectionTable from './components/ConnectionTable';
 import TrafficChart from './components/TrafficChart';
+import { CountryBadge } from './components/CountryFlagSVG';
 
 const REFRESH_INTERVAL_MS = 10000; // Corresponds to interval in electron.ts
 
@@ -100,7 +101,10 @@ const App: React.FC = () => {
                     <div className="flex gap-3 flex-wrap items-center">
                         {selectedCountry && (
                             <div className="flex items-center gap-2 px-3 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded-lg">
-                                <span className="text-sm text-cyan-300 font-semibold">Filtering: {selectedCountry}</span>
+                                <span className="text-sm text-cyan-300 font-semibold flex items-center gap-1.5">
+                                    <span>Filtering:</span>
+                                    <CountryBadge countryCode={selectedCountry} showName={true} size="md" />
+                                </span>
                                 <button
                                     onClick={() => setSelectedCountry(null)}
                                     className="text-cyan-400 hover:text-cyan-300 font-bold text-sm"
