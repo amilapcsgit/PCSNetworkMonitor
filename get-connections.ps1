@@ -1,22 +1,56 @@
-# Function to get geolocation information for a given IP address
 function Get-IPGeolocation {
     param (
         [string]$ip
     )
-    try {
-        # Use a timeout to prevent the script from hanging on a slow network request
-        $response = Invoke-RestMethod -Uri "http://ipinfo.io/$ip/json" -TimeoutSec 5
-        return [PSCustomObject]@{
-            Country = $response.country
-            Region  = $response.region
+    
+    $geoServiceUrl = @(
+        @{
+            Name = "ipinfo.io"
+            Uri = "http://ipinfo.io/$ip/json"
+            CountryField = "country"
+            RegionField = "region"
+        },
+        @{
+            Name = "ip-api.com"
+            Uri = "http://ip-api.com/json/$ip"
+            CountryField = "countryCode"
+            RegionField = "regionName"
+        },
+        @{
+            Name = "geojs.io"
+            Uri = "https://get.geojs.io/geolocation/ip/$ip.json"
+            CountryField = "country_code"
+            RegionField = "region"
+        },
+        @{
+            Name = "ipwhois.io"
+            Uri = "https://ipwhois.io/api/json/ip/$ip"
+            CountryField = "country_code"
+            RegionField = "region"
+        }
+    )
+    
+    foreach ($service in $geoServiceUrl) {
+        try {
+            $response = Invoke-RestMethod -Uri $service.Uri -TimeoutSec 3 -ErrorAction Stop
+            
+            $country = $response.($service.CountryField)
+            $region = $response.($service.RegionField)
+            
+            if ($country -and $country -ne "") {
+                return [PSCustomObject]@{
+                    Country = $country
+                    Region  = if ($region) { $region } else { "Unknown" }
+                }
+            }
+        }
+        catch {
         }
     }
-    catch {
-        # If the request fails for any reason, return "Unknown"
-        return [PSCustomObject]@{
-            Country = "Unknown"
-            Region  = "Unknown"
-        }
+    
+    return [PSCustomObject]@{
+        Country = "Unknown"
+        Region  = "Unknown"
     }
 }
 

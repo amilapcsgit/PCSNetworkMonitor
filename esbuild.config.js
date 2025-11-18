@@ -9,7 +9,12 @@ const esbuildOptions = {
     sourcemap: true,
     format: 'esm',
     define: { 'process.env.NODE_ENV': isWatch ? '"development"' : '"production"' },
-    loader: { '.tsx': 'tsx', '.ts': 'ts' },
+    loader: { 
+        '.tsx': 'tsx', 
+        '.ts': 'ts',
+        '.svg': 'dataurl',
+        '.css': 'css'
+    },
     // Mark packages that are loaded via CDN/importmap as external
     external: ['react', 'react-dom', 'react-dom/*', 'recharts'],
 };

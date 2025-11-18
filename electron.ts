@@ -1,16 +1,42 @@
-// Fix: Switched to a namespace import for Electron to prevent module resolution conflicts
-// caused by the file being named 'electron.ts'. This resolves errors for 'app',
-// 'BrowserWindow', and Node.js types like `Buffer` and globals like `__dirname`.
-import * as Electron from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { spawn } from 'child_process';
 import os from 'os';
 import fs from 'fs';
+import type { ConnectionDetail } from './types';
+import { MOCK_CONNECTIONS } from './utils/mockConnections';
 
 const REFRESH_INTERVAL_MS = 10000; // 10 seconds
+let mainWindow: BrowserWindow | null = null;
+let refreshInterval: NodeJS.Timeout | null = null;
+const isWindows = os.platform() === 'win32';
 
-function createWindow(): Electron.BrowserWindow {
-  const mainWindow = new Electron.BrowserWindow({
+const sendMockData = (window: BrowserWindow, reason: string) => {
+  console.warn(`Falling back to mock data: ${reason}`);
+  if (!window.isDestroyed()) {
+    const enrichedMock: ConnectionDetail[] = MOCK_CONNECTIONS.map((conn, idx) => ({
+      ...conn,
+      processId: conn.processId + idx,
+    }));
+    window.webContents.send('connections-update', enrichedMock);
+  }
+};
+
+const triggerFetch = () => {
+  if (mainWindow) {
+    fetchNetworkConnections(mainWindow);
+  }
+};
+
+const startPolling = () => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+  refreshInterval = setInterval(triggerFetch, REFRESH_INTERVAL_MS);
+};
+
+function createWindow(): BrowserWindow {
+  const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
@@ -27,7 +53,7 @@ function createWindow(): Electron.BrowserWindow {
     mainWindow.show();
   });
 
-  if (Electron.app.isPackaged) {
+  if (app.isPackaged) {
     mainWindow.loadFile(path.join(__dirname, '..', 'index.html'));
   } else {
     mainWindow.loadURL('http://localhost:8001');
@@ -41,9 +67,9 @@ function getScriptPath(): string {
     const scriptName = 'get-connections.ps1';
     let scriptPath: string;
     
-    if (Electron.app.isPackaged) {
+    if (app.isPackaged) {
         // For packaged app (both installer and portable)
-        const appPath = Electron.app.getAppPath();
+        const appPath = app.getAppPath();
         
         // Try different possible locations
         const possiblePaths = [
@@ -67,16 +93,21 @@ function getScriptPath(): string {
     return scriptPath;
 }
 
-function fetchNetworkConnections(window: Electron.BrowserWindow) {
-    const scriptPath = getScriptPath();
-    console.log(`Fetching network connections using script at: ${scriptPath}`);
-    
-    if (!fs.existsSync(scriptPath)) {
-        console.error(`Script not found at: ${scriptPath}`);
-        window.webContents.send('connections-error', `PowerShell script not found at: ${scriptPath}`);
+function fetchNetworkConnections(window: BrowserWindow) {
+    if (!isWindows) {
+        sendMockData(window, 'PowerShell is unavailable on non-Windows environments');
         return;
     }
-    
+
+    const scriptPath = getScriptPath();
+    console.log(`Fetching network connections using script at: ${scriptPath}`);
+
+    if (!fs.existsSync(scriptPath)) {
+        console.error(`Script not found at: ${scriptPath}`);
+        sendMockData(window, `PowerShell script not found at: ${scriptPath}`);
+        return;
+    }
+
     const ps = spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath]);
     
     let stdoutData = '';
@@ -90,37 +121,56 @@ function fetchNetworkConnections(window: Electron.BrowserWindow) {
         stderrData += data.toString();
     });
 
+    ps.on('error', (error: Error) => {
+        console.error('PowerShell spawn failed:', error);
+        sendMockData(window, error.message);
+    });
+
     ps.on('close', (code: number | null) => {
+        if (!window || window.isDestroyed()) {
+            return;
+        }
+
         if (code === 0 && stdoutData) {
             try {
-                const connections = JSON.parse(stdoutData);
+                const connections = JSON.parse(stdoutData) as ConnectionDetail[];
                 window.webContents.send('connections-update', connections);
             } catch (e) {
                 console.error('Failed to parse PowerShell output:', e, 'Raw output:', stdoutData);
-                window.webContents.send('connections-error', 'Failed to parse network data.');
+                sendMockData(window, 'Failed to parse network data');
             }
         } else {
             console.error(`PowerShell script exited with code ${code}: ${stderrData}`);
-            window.webContents.send('connections-error', `Error executing script: ${stderrData || 'No error output'}`);
+            sendMockData(window, stderrData || 'No error output');
         }
     });
 }
 
-Electron.app.whenReady().then(() => {
-  const mainWindow = createWindow();
+app.whenReady().then(() => {
+  mainWindow = createWindow();
 
-  fetchNetworkConnections(mainWindow);
-  setInterval(() => fetchNetworkConnections(mainWindow), REFRESH_INTERVAL_MS);
+  triggerFetch();
+  startPolling();
 
-  Electron.app.on('activate', () => {
-    if (Electron.BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+  ipcMain.on('request-refresh', triggerFetch);
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      mainWindow = createWindow();
+      triggerFetch();
+      startPolling();
     }
   });
 });
 
-Electron.app.on('window-all-closed', () => {
+app.on('window-all-closed', () => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+  ipcMain.removeAllListeners('request-refresh');
+  mainWindow = null;
   if (os.platform() !== 'darwin') {
-    Electron.app.quit();
+    app.quit();
   }
 });

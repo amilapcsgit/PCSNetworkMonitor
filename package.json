@@ -5,20 +5,25 @@
   "main": "build/electron.js",
   "homepage": "./",
   "scripts": {
-    "start": "concurrently \"npm:watch:js\" \"npm:watch:css\"",
+    "ensure-deps": "node scripts/ensure-deps.js",
+    "dev:watch": "concurrently \"npm:watch:js\" \"npm:watch:css\"",
+    "start": "npm run ensure-deps && npm run dev:watch",
     "watch:js": "node esbuild.config.js --watch",
     "watch:css": "tailwindcss -i ./index.css -o ./build/styles.css --watch",
     "build:js": "node esbuild.config.js",
     "build:css": "tailwindcss -i ./index.css -o ./build/styles.css",
+    "prebuild": "npm run ensure-deps",
     "build": "npm run build:css && npm run build:js",
-    "electron:start": "concurrently \"npm:start\" \"npm:electron\"",
+    "electron:start": "npm run ensure-deps && concurrently \"npm:dev:watch\" \"npm:electron\"",
+    "preelectron": "npm run ensure-deps",
     "electron": "wait-on ./build/bundle.js && wait-on ./build/styles.css && tsc --project tsconfig.electron.json && electron .",
-    "electron:build": "npm run build && tsc --project tsconfig.electron.json && electron-builder"
+    "electron:build": "npm run ensure-deps && npm run build && tsc --project tsconfig.electron.json && electron-builder"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "flag-icons": "^7.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -47,7 +52,9 @@
       "buildResources": "assets"
     },
     "win": {
-      "target": ["portable"]
+      "target": [
+        "portable"
+      ]
     }
   }
 }
