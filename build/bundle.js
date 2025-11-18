@@ -3,7 +3,7 @@ import React4 from "react";
 import ReactDOM from "react-dom/client";
 
 // App.tsx
-import { useState as useState2, useEffect, useCallback } from "react";
+import { useState as useState2, useEffect, useCallback, useMemo as useMemo3 } from "react";
 
 // components/icons/RefreshIcon.tsx
 import { jsx } from "react/jsx-runtime";
@@ -741,6 +741,98 @@ var TrafficChart = ({ connections, isLoading, selectedCountry, onCountrySelect }
 };
 var TrafficChart_default = TrafficChart;
 
+// utils/mockConnections.ts
+var MOCK_CONNECTIONS = [
+  {
+    localAddress: "192.168.1.20",
+    localPort: 5357,
+    remoteAddress: "104.244.42.129",
+    remotePort: 443,
+    state: "Established",
+    processId: 4120,
+    processName: "Teams.exe",
+    country: "US",
+    region: "United States"
+  },
+  {
+    localAddress: "192.168.1.20",
+    localPort: 5358,
+    remoteAddress: "52.109.12.45",
+    remotePort: 443,
+    state: "Established",
+    processId: 4120,
+    processName: "Teams.exe",
+    country: "IE",
+    region: "Ireland"
+  },
+  {
+    localAddress: "192.168.1.20",
+    localPort: 49215,
+    remoteAddress: "35.190.247.13",
+    remotePort: 443,
+    state: "Established",
+    processId: 9024,
+    processName: "Chrome.exe",
+    country: "US",
+    region: "United States"
+  },
+  {
+    localAddress: "192.168.1.20",
+    localPort: 50283,
+    remoteAddress: "13.35.16.22",
+    remotePort: 443,
+    state: "Established",
+    processId: 9024,
+    processName: "Chrome.exe",
+    country: "DE",
+    region: "Germany"
+  },
+  {
+    localAddress: "192.168.1.20",
+    localPort: 58543,
+    remoteAddress: "54.239.39.102",
+    remotePort: 443,
+    state: "Established",
+    processId: 5880,
+    processName: "OneDrive.exe",
+    country: "US",
+    region: "United States"
+  },
+  {
+    localAddress: "192.168.1.20",
+    localPort: 60123,
+    remoteAddress: "151.101.1.69",
+    remotePort: 443,
+    state: "Established",
+    processId: 1340,
+    processName: "Code.exe",
+    country: "NL",
+    region: "Netherlands"
+  },
+  {
+    localAddress: "192.168.1.20",
+    localPort: 60124,
+    remoteAddress: "172.217.9.206",
+    remotePort: 443,
+    state: "Established",
+    processId: 1340,
+    processName: "Code.exe",
+    country: "US",
+    region: "United States"
+  },
+  {
+    localAddress: "192.168.1.20",
+    localPort: 60130,
+    remoteAddress: "20.43.132.10",
+    remotePort: 443,
+    state: "Established",
+    processId: 2230,
+    processName: "Outlook.exe",
+    country: "GB",
+    region: "United Kingdom"
+  }
+];
+
 // App.tsx
 import { jsx as jsx8, jsxs as jsxs5 } from "react/jsx-runtime";
 var REFRESH_INTERVAL_MS = 1e4;
@@ -750,11 +842,58 @@ var App = () => {
   const [error, setError] = useState2(null);
   const [lastUpdated, setLastUpdated] = useState2(null);
   const [selectedCountry, setSelectedCountry] = useState2(null);
-  const filteredConnections = selectedCountry ? connections.filter((conn) => conn.country === selectedCountry) : connections;
+  const [searchQuery, setSearchQuery] = useState2("");
+  const [isDemoMode, setIsDemoMode] = useState2(false);
+  const hasElectronBridge = typeof window !== "undefined" && Boolean(window.electronAPI);
+  const applyConnectionUpdate = useCallback((data) => {
+    const sortedData = [...data].sort((a, b) => a.processName.localeCompare(b.processName));
+    setConnections(sortedData);
+    setLastUpdated(/* @__PURE__ */ new Date());
+    setError(null);
+    setIsLoading(false);
+  }, []);
+  const filteredConnections = useMemo3(() => {
+    let data = selectedCountry ? connections.filter((conn) => conn.country === selectedCountry) : connections;
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      data = data.filter((conn) => {
+        const connectionTarget = `${conn.remoteAddress}:${conn.remotePort}`.toLowerCase();
+        return conn.processName.toLowerCase().includes(query) || connectionTarget.includes(query) || conn.region?.toLowerCase().includes(query) || conn.country?.toLowerCase().includes(query);
+      });
+    }
+    return data;
+  }, [connections, selectedCountry, searchQuery]);
+  const summaryStats = useMemo3(() => {
+    const totalConnections = connections.length;
+    const uniqueProcesses = new Set(connections.map((conn) => conn.processName)).size;
+    const uniqueCountries = new Set(connections.map((conn) => conn.country)).size;
+    const countryCounts = connections.reduce((acc, conn) => {
+      const code = conn.country || "Unknown";
+      acc[code] = (acc[code] || 0) + 1;
+      return acc;
+    }, {});
+    const sortedCountries = Object.entries(countryCounts).sort((a, b) => b[1] - a[1]);
+    const topCountry = sortedCountries.length ? { code: sortedCountries[0][0], count: sortedCountries[0][1] } : null;
+    return {
+      totalConnections,
+      uniqueProcesses,
+      uniqueCountries,
+      topCountry
+    };
+  }, [connections]);
+  const filtersActive = Boolean(selectedCountry || searchQuery.trim());
   const manualRefresh = useCallback(() => {
     setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 1e3);
-  }, []);
+    setError(null);
+    if (hasElectronBridge) {
+      window.electronAPI?.requestRefresh();
+      return;
+    }
+    setIsDemoMode(true);
+    setTimeout(() => {
+      applyConnectionUpdate(MOCK_CONNECTIONS);
+    }, 300);
+  }, [applyConnectionUpdate, hasElectronBridge]);
   const handleExportData = useCallback(() => {
     const data = filteredConnections.map((conn) => ({
       process: conn.processName,
@@ -781,24 +920,28 @@ var App = () => {
     navigator.clipboard.writeText(text);
   }, [filteredConnections]);
   useEffect(() => {
+    if (!hasElectronBridge) {
+      setIsDemoMode(true);
+      const timer = setTimeout(() => {
+        applyConnectionUpdate(MOCK_CONNECTIONS);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
     const handleConnectionUpdate = (data) => {
-      const sortedData = data.sort((a, b) => a.processName.localeCompare(b.processName));
-      setConnections(sortedData);
-      setLastUpdated(/* @__PURE__ */ new Date());
-      setError(null);
-      setIsLoading(false);
+      setIsDemoMode(false);
+      applyConnectionUpdate(data);
     };
     const handleConnectionError = (errorMessage) => {
       console.error("Backend error:", errorMessage);
       setError(`Failed to get network data. Details: ${errorMessage}`);
       setIsLoading(false);
     };
-    window.electronAPI.onConnectionUpdate(handleConnectionUpdate);
-    window.electronAPI.onConnectionError(handleConnectionError);
+    window.electronAPI?.onConnectionUpdate(handleConnectionUpdate);
+    window.electronAPI?.onConnectionError(handleConnectionError);
     return () => {
-      window.electronAPI.removeAllListeners();
+      window.electronAPI?.removeAllListeners();
     };
-  }, []);
+  }, [applyConnectionUpdate, hasElectronBridge]);
   return /* @__PURE__ */ jsx8("div", { className: "min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950 text-gray-200 font-sans", children: /* @__PURE__ */ jsxs5("div", { className: "container mx-auto p-4 md:p-8 max-w-screen-2xl", children: [
     /* @__PURE__ */ jsx8(
       Header_default,
@@ -809,11 +952,56 @@ var App = () => {
       }
     ),
     /* @__PURE__ */ jsxs5("main", { className: "mt-10 space-y-6", children: [
+      isDemoMode && /* @__PURE__ */ jsxs5("div", { className: "bg-gradient-to-r from-cyan-950 to-slate-900 border border-cyan-700/60 text-cyan-100 px-6 py-4 rounded-xl relative shadow-lg backdrop-blur-sm", role: "status", children: [
+        /* @__PURE__ */ jsx8("strong", { className: "font-bold block mb-1", children: "Demo data active" }),
+        /* @__PURE__ */ jsx8("span", { className: "block text-sm", children: "The PowerShell collector isn't available, so you're viewing rich sample data." })
+      ] }),
       error && /* @__PURE__ */ jsxs5("div", { className: "bg-gradient-to-r from-red-950 to-red-900 border border-red-700 text-red-100 px-6 py-4 rounded-xl relative shadow-lg backdrop-blur-sm", role: "alert", children: [
         /* @__PURE__ */ jsx8("strong", { className: "font-bold block mb-1", children: "\u26A0\uFE0F Error" }),
         /* @__PURE__ */ jsx8("span", { className: "block text-sm", children: error })
       ] }),
+      /* @__PURE__ */ jsxs5("section", { className: "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4", children: [
+        /* @__PURE__ */ jsxs5("article", { className: "rounded-2xl bg-gradient-to-br from-slate-800/70 to-gray-900/70 border border-gray-700/50 p-4 shadow-xl", children: [
+          /* @__PURE__ */ jsx8("p", { className: "text-xs uppercase tracking-[0.2em] text-gray-500", children: "Connections" }),
+          /* @__PURE__ */ jsx8("p", { className: "text-3xl font-semibold text-white mt-2", children: summaryStats.totalConnections.toLocaleString() }),
+          /* @__PURE__ */ jsx8("p", { className: "text-sm text-gray-400 mt-1", children: filtersActive ? `${filteredConnections.length.toLocaleString()} shown after filters` : "All connections visible" })
+        ] }),
+        /* @__PURE__ */ jsxs5("article", { className: "rounded-2xl bg-gradient-to-br from-slate-800/70 to-gray-900/70 border border-gray-700/50 p-4 shadow-xl", children: [
+          /* @__PURE__ */ jsx8("p", { className: "text-xs uppercase tracking-[0.2em] text-gray-500", children: "Processes" }),
+          /* @__PURE__ */ jsx8("p", { className: "text-3xl font-semibold text-white mt-2", children: summaryStats.uniqueProcesses.toLocaleString() }),
+          /* @__PURE__ */ jsx8("p", { className: "text-sm text-gray-400 mt-1", children: "Grouped automatically in the table" })
+        ] }),
+        /* @__PURE__ */ jsxs5("article", { className: "rounded-2xl bg-gradient-to-br from-slate-800/70 to-gray-900/70 border border-gray-700/50 p-4 shadow-xl", children: [
+          /* @__PURE__ */ jsx8("p", { className: "text-xs uppercase tracking-[0.2em] text-gray-500", children: "Countries" }),
+          /* @__PURE__ */ jsx8("p", { className: "text-3xl font-semibold text-white mt-2", children: summaryStats.uniqueCountries.toLocaleString() }),
+          /* @__PURE__ */ jsx8("p", { className: "text-sm text-gray-400 mt-1", children: "Detected from remote endpoints" })
+        ] }),
+        /* @__PURE__ */ jsxs5("article", { className: "rounded-2xl bg-gradient-to-br from-slate-800/70 to-gray-900/70 border border-gray-700/50 p-4 shadow-xl", children: [
+          /* @__PURE__ */ jsx8("p", { className: "text-xs uppercase tracking-[0.2em] text-gray-500", children: "Top Destination" }),
+          summaryStats.topCountry ? /* @__PURE__ */ jsxs5("div", { className: "mt-3 flex items-center justify-between", children: [
+            /* @__PURE__ */ jsx8(CountryBadge, { countryCode: summaryStats.topCountry.code, showName: true, size: "md", className: "text-gray-100" }),
+            /* @__PURE__ */ jsxs5("span", { className: "text-sm text-cyan-300 font-semibold bg-cyan-500/10 border border-cyan-500/30 rounded-full px-3 py-1", children: [
+              summaryStats.topCountry.count,
+              " connections"
+            ] })
+          ] }) : /* @__PURE__ */ jsx8("p", { className: "text-sm text-gray-500 mt-2", children: "No country data yet" })
+        ] })
+      ] }),
       /* @__PURE__ */ jsxs5("div", { className: "flex gap-3 flex-wrap items-center", children: [
+        /* @__PURE__ */ jsxs5("div", { className: "relative flex-1 min-w-[240px] max-w-xl", children: [
+          /* @__PURE__ */ jsx8("span", { className: "absolute left-3 top-3 text-gray-500", children: "\u{1F50D}" }),
+          /* @__PURE__ */ jsx8(
+            "input",
+            {
+              type: "text",
+              value: searchQuery,
+              onChange: (event) => setSearchQuery(event.target.value),
+              placeholder: "Search process, host, port or region...",
+              className: "w-full bg-gray-900/40 border border-gray-700/60 rounded-lg pl-9 pr-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/70 focus:border-transparent",
+              "aria-label": "Search connections"
+            }
+          )
+        ] }),
         selectedCountry && /* @__PURE__ */ jsxs5("div", { className: "flex items-center gap-2 px-3 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded-lg", children: [
           /* @__PURE__ */ jsxs5("span", { className: "text-sm text-cyan-300 font-semibold flex items-center gap-1.5", children: [
             /* @__PURE__ */ jsx8("span", { children: "Filtering:" }),
