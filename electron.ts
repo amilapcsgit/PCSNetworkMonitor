@@ -53,11 +53,14 @@ function createWindow(): BrowserWindow {
     mainWindow.show();
   });
 
-  if (app.isPackaged) {
-    mainWindow.loadFile(path.join(__dirname, '..', 'index.html'));
-  } else {
+  const isDev = !app.isPackaged;
+
+  if (isDev) {
     mainWindow.loadURL('http://localhost:8001');
     mainWindow.webContents.openDevTools();
+  } else {
+    const indexHtmlPath = path.join(app.getAppPath(), 'build', 'index.html');
+    mainWindow.loadFile(indexHtmlPath);
   }
 
   return mainWindow;
@@ -65,32 +68,12 @@ function createWindow(): BrowserWindow {
 
 function getScriptPath(): string {
     const scriptName = 'get-connections.ps1';
-    let scriptPath: string;
-    
+
     if (app.isPackaged) {
-        // For packaged app (both installer and portable)
-        const appPath = app.getAppPath();
-        
-        // Try different possible locations
-        const possiblePaths = [
-            path.join(appPath, '..', '..', scriptName),  // Portable: next to exe
-            path.join(appPath, '..', scriptName),         // Installer resources
-            path.join(appPath, scriptName),               // In app.asar root
-        ];
-        
-        scriptPath = possiblePaths[0]; // Default to first
-        for (const p of possiblePaths) {
-            if (fs.existsSync(p)) {
-                scriptPath = p;
-                break;
-            }
-        }
-    } else {
-        // In development, script is in project root
-        scriptPath = path.join(__dirname, '..', scriptName);
+        return path.join(process.resourcesPath, scriptName);
     }
 
-    return scriptPath;
+    return path.join(app.getAppPath(), scriptName);
 }
 
 function fetchNetworkConnections(window: BrowserWindow) {
