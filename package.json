@@ -40,7 +40,7 @@
     "wait-on": "^7.2.0"
   },
   "build": {
-    "appId": "com.networkmonitor.app",
+    "appId": "com.pcs.networkmonitor",
     "productName": "Network Monitor",
     "files": [
       "build/**/*",
@@ -54,6 +54,9 @@
       "target": [
         "portable"
       ]
-    }
+    },
+    "extraResources": [
+      "get-connections.ps1"
+    ]
   }
 }
